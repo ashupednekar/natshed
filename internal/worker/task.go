@@ -65,7 +65,7 @@ func startTaskConsumer(js nats.JetStreamContext, taskID, ackWait string) {
 			if now.After(payload.NextExec) || now.Equal(payload.NextExec) {
 				fmt.Printf("EXECUTING TASK: %s\n", payload.TaskID)
 				msg.Ack()
-        if payload.Iter <= payload.MaxIter{
+        if payload.Iter < payload.MaxIter{
           payload.Iter += 1
           duration, err := time.ParseDuration(payload.AckWait)
           if err != nil{
