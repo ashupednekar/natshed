@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ashupednekar/natshed/internal/common"
@@ -64,6 +65,23 @@ func startTaskConsumer(js nats.JetStreamContext, taskID, ackWait string) {
 			if now.After(payload.NextExec) || now.Equal(payload.NextExec) {
 				fmt.Printf("EXECUTING TASK: %s\n", payload.TaskID)
 				msg.Ack()
+        if payload.Iter <= payload.MaxIter{
+          payload.Iter += 1
+          duration, err := time.ParseDuration(payload.AckWait)
+          if err != nil{
+            log.Fatalf("error parsing duration: %v", err)
+          }
+          payload.NextExec = time.Now().Add(duration)
+          payloadBytes, err := json.Marshal(payload)
+          if err != nil{
+            log.Fatalf("Error marshaling payload: %v", err)
+          }
+          subject := fmt.Sprintf("tasks.execute.%s", taskID)
+          _, err = js.Publish(subject, payloadBytes)
+          if err != nil {
+            log.Fatalf("Error publishing to %s: %v\n", subject, err)
+          }
+        }
 			} else {
 				// Skip execution
 				msg.Nak()

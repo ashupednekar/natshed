@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/ashupednekar/natshed/internal/common"
@@ -30,6 +31,20 @@ func RunClient(cmd *cobra.Command, args []string) {
 		log.Fatal("Error: duration is required")
 	}
 
+  max_iter_str, err := cmd.Flags().GetString("max-occurrences")
+  if err != nil {
+    log.Fatal(err)
+  }
+  var max_iter int
+  if max_iter_str == "" {
+    max_iter = 1
+  } else {
+    max_iter, err = strconv.Atoi(max_iter_str)
+    if err != nil {
+      log.Fatalf("Invalid value for max-occurrences: %v", err)
+    }
+  }
+
 	nc, err := nats.Connect(os.Getenv("NATS_URL"))
 	if err != nil {
 		log.Fatalf("Error connecting to NATS: %v\n", err)
@@ -54,6 +69,8 @@ func RunClient(cmd *cobra.Command, args []string) {
 		TaskID:   taskID,
 		NextExec: time.Now().Add(parsedDuration),
 		AckWait:  duration,
+    Iter: 1,
+    MaxIter: max_iter, 
 	}
 
 	payloadBytes, err := json.Marshal(payload)
