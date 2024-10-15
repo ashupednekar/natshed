@@ -29,6 +29,8 @@ func RunWorker(cmd *cobra.Command, args []string) {
 	// Start internal consumer
 	go consumeInternal(js)
 
+  // TODO: get consumer list from nats and spawn task consumers
+
 	// Keep the main goroutine running
 	select {}
 }
