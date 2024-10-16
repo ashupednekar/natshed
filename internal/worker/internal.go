@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ashupednekar/natshed/internal/common"
@@ -23,18 +24,31 @@ func RunWorker(cmd *cobra.Command, args []string) {
 	js, err := nc.JetStream()
 	if err != nil {
 		fmt.Printf("Error getting JetStream context: %v\n", err)
-		return
 	}
 
 	// Start internal consumer
 	go consumeInternal(js)
 
+  spawnExistingTaskConsumers(js)
   // TODO: get consumer list from nats and spawn task consumers
 
 	// Keep the main goroutine running
 	select {}
 }
 
+func spawnExistingTaskConsumers(js nats.JetStreamContext){
+    consumerChan := js.Consumers("tasks")
+
+    // Use a loop to read from the consumer channel
+    for consumerInfo := range consumerChan {
+        if consumerInfo == nil {
+            break // Exit the loop if nil is returned (channel closed)
+        }
+        fmt.Printf("Consumer Name: %s, Details: %+v\n", consumerInfo.Name, consumerInfo)
+        taskID := strings.ReplaceAll(consumerInfo.Name, "consumer-", "")
+        go startTaskConsumer(js, taskID, consumerInfo.Config.AckWait)
+    }
+}
 
 func consumeInternal(js nats.JetStreamContext) {
 	// Create a pull consumer for tasks.internal
@@ -81,7 +95,12 @@ func consumeInternal(js nats.JetStreamContext) {
 			_, err = js.ConsumerInfo("tasks", consumerName)
 			if err != nil {
 				// Consumer doesn't exist, start a new one
-				go startTaskConsumer(js, payload.TaskID, payload.AckWait)
+        ackDuration, err := time.ParseDuration(payload.AckWait)
+        if err != nil {
+          fmt.Printf("Error parsing ack wait duration: %v\n", err)
+          return
+        }
+				go startTaskConsumer(js, payload.TaskID, ackDuration)
 			}
 
 			msg.Ack()

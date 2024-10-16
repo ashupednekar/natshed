@@ -12,20 +12,14 @@ import (
 )
 
 
-func startTaskConsumer(js nats.JetStreamContext, taskID, ackWait string) {
+func startTaskConsumer(js nats.JetStreamContext, taskID string, ackWait time.Duration) {
 	subject := fmt.Sprintf("tasks.execute.%s", taskID)
 	consumerName := fmt.Sprintf("consumer-%s", taskID)
 	
-	ackDuration, err := time.ParseDuration(ackWait)
-	if err != nil {
-		fmt.Printf("Error parsing ack wait duration: %v\n", err)
-		return
-	}
-
-	_, err = js.AddConsumer("tasks", &nats.ConsumerConfig{
+  _, err := js.AddConsumer("tasks", &nats.ConsumerConfig{
 		Durable:        consumerName,
 		AckPolicy:      nats.AckExplicitPolicy,
-		AckWait:        ackDuration,
+		AckWait:        ackWait,
 		FilterSubject:  subject,
 	})
 	if err != nil {
