@@ -30,10 +30,8 @@ func RunWorker(cmd *cobra.Command, args []string) {
 	go consumeInternal(js)
 
   spawnExistingTaskConsumers(js)
-  // TODO: get consumer list from nats and spawn task consumers
 
-	// Keep the main goroutine running
-	select {}
+  select {}
 }
 
 func spawnExistingTaskConsumers(js nats.JetStreamContext){
