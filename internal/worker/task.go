@@ -57,6 +57,8 @@ func startTaskConsumer(js nats.JetStreamContext, taskID string, ackWait time.Dur
 
 			now := time.Now()
 			if now.After(payload.NextExec) || now.Equal(payload.NextExec) {
+        fmt.Printf("received task event: %v\n", payload)
+        payload.UpdateAckWait(js, consumerName)
         // TODO: calculate and update consumer ackWait
 				fmt.Printf("EXECUTING TASK: %s\n", payload.TaskID)
 				msg.Ack()

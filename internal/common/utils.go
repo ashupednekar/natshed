@@ -2,12 +2,24 @@ package common
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/nats-io/nats.go"
 )
 
+func ConnectNATS() (*nats.Conn, nats.JetStreamContext) {
+	nc, err := nats.Connect(os.Getenv("NATS_URL"))
+	if err != nil {
+		log.Fatalf("Error connecting to NATS: %v\n", err)
+	}
 
+	js, err := nc.JetStream()
+	if err != nil {
+		log.Fatalf("Error getting JetStream context: %v\n", err)
+	}
+	return nc, js
+}
 
 func CreateStream(){
 	nc, err := nats.Connect(os.Getenv("NATS_URL"))

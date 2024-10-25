@@ -42,7 +42,6 @@ func spawnExistingTaskConsumers(js nats.JetStreamContext){
         if consumerInfo == nil {
             break // Exit the loop if nil is returned (channel closed)
         }
-        fmt.Printf("Consumer Name: %s, Details: %+v\n", consumerInfo.Name, consumerInfo)
         taskID := strings.ReplaceAll(consumerInfo.Name, "consumer-", "")
         go startTaskConsumer(js, taskID, consumerInfo.Config.AckWait)
     }

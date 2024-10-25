@@ -30,6 +30,7 @@ func main() {
 
 	clientCmd.Flags().String("task-id", "", "Task ID")
 	clientCmd.Flags().String("duration", "1m", "Task duration")
+	clientCmd.Flags().String("cron-string", "1m", "Task cronstring")
 	clientCmd.Flags().String("max-occurrences", "1", "Max Occurrences")
 
   common.CreateStream()

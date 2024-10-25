@@ -4,31 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
-	"time"
-
 	"github.com/ashupednekar/natshed/internal/common"
-	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 )
 
-
-func RunClient(cmd *cobra.Command, args []string) {
+func ParseArgs(cmd *cobra.Command) (string, int, string, string) {
 	taskID, err := cmd.Flags().GetString("task-id")
 	if err != nil {
 		log.Fatal(err)
 	}
 	if taskID == "" {
 		log.Fatal("Error: task-id is required")
-	}
-
-	duration, err := cmd.Flags().GetString("duration")
-	if err != nil {
-		log.Fatal(err)
-	}
-	if duration == "" {
-		log.Fatal("Error: duration is required")
 	}
 
   max_iter_str, err := cmd.Flags().GetString("max-occurrences")
@@ -45,49 +32,45 @@ func RunClient(cmd *cobra.Command, args []string) {
     }
   }
 
-	nc, err := nats.Connect(os.Getenv("NATS_URL"))
+	duration, err := cmd.Flags().GetString("duration")
 	if err != nil {
-		log.Fatalf("Error connecting to NATS: %v\n", err)
-	}
-	defer nc.Close()
-
-	js, err := nc.JetStream()
-	if err != nil {
-		log.Fatalf("Error getting JetStream context: %v\n", err)
+		log.Fatal(err)
 	}
 
-	// Check if consumer exists
-	consumerName := fmt.Sprintf("consumer-%s", taskID)
-  _, consumer_err := js.ConsumerInfo("tasks", consumerName)
-
-	parsedDuration, err := time.ParseDuration(duration)
+	cron_string, err := cmd.Flags().GetString("cron-string")
 	if err != nil {
-		log.Fatalf("Error parsing duration: %v\n", err)
+		log.Fatal(err)
 	}
+  return taskID, max_iter, duration, cron_string
+}
 
-	payload := common.TaskPayload{
+func RunClient(cmd *cobra.Command, args []string) {
+  nc, js := common.ConnectNATS()
+  defer nc.Close()
+  taskID, maxIter, duration, cronString := ParseArgs(cmd)	
+  payload := common.TaskPayload{
 		TaskID:   taskID,
-		NextExec: time.Now().Add(parsedDuration),
 		AckWait:  duration,
+    Schedule: common.Schedule{},
     Iter: 1,
-    MaxIter: max_iter, 
+    MaxIter: maxIter, 
 	}
-
+  schedule := common.Schedule{CronString: cronString, Duration: duration}
+  payload = schedule.UpdatePayload(&payload)
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Fatalf("Error marshaling payload: %v\n", err)
 	}
 
+	consumerName := fmt.Sprintf("consumer-%s", taskID)
+  _, consumer_err := js.ConsumerInfo("tasks", consumerName)
 	if consumer_err != nil {
-		// Consumer doesn't exist, publish to tasks.internal
 		_, err = js.Publish("tasks.internal", payloadBytes)
 		if err != nil {
 			log.Fatalf("Error publishing to tasks.internal: %v\n", err)
 		}
 		fmt.Println("Task scheduled for first time")
 	}
-
-	// Publish to tasks.execute.<task_id>
 	subject := fmt.Sprintf("tasks.execute.%s", taskID)
 	_, err = js.Publish(subject, payloadBytes)
 	if err != nil {
