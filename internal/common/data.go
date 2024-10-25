@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/robfig/cron"
 )
 
 type Schedule struct{
@@ -38,7 +39,12 @@ func (s *Schedule) GetAckWait() (time.Duration, error) {
   var ackWait time.Duration 
   if s.Duration == "" {
     if s.CronString != ""{
-      ackWait = time.Second * 5 // TODO: use a cron library to get this value
+      schedule, err := cron.ParseStandard(s.CronString)
+      now := time.Now()
+      ackWait = schedule.Next(now).Sub(now)
+      if err != nil{
+        return 0, err
+      }
     }else{
       return 0, fmt.Errorf("Error: cron string is required if duration is not passed")
     }
@@ -68,16 +74,9 @@ func (p *TaskPayload) UpdateAckWait(js nats.JetStreamContext, consumerName strin
   }
 
   fmt.Printf("schedule: %v\n", p.Schedule)
-  var ackWait time.Duration 
-  if p.Schedule.Duration != "" {
-    ackWait, err = time.ParseDuration(p.Schedule.Duration)
-    if err != nil {
-      return err
-    }
-  } else if p.Schedule.CronString != "" {
-    ackWait = time.Second * 5  // TODO: use a cron library to get this value
-  } else {
-    return fmt.Errorf("invalid schedule config")
+  ackWait, err := p.Schedule.GetAckWait()
+  if err != nil{
+    return err
   }
   fmt.Printf("new ackWait for %s: %v\n", consumerName, ackWait)
   fmt.Printf("consumer info: %v\n", info) 
