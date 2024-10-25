@@ -50,13 +50,15 @@ func RunClient(cmd *cobra.Command, args []string) {
   taskID, maxIter, duration, cronString := ParseArgs(cmd)	
   payload := common.TaskPayload{
 		TaskID:   taskID,
-		AckWait:  duration,
     Schedule: common.Schedule{},
     Iter: 1,
     MaxIter: maxIter, 
 	}
   schedule := common.Schedule{CronString: cronString, Duration: duration}
-  payload = schedule.UpdatePayload(&payload)
+  err := schedule.UpdatePayload(&payload)
+  if err != nil{
+    log.Fatalf("Error updating payload: %v\n", err)
+  }
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Fatalf("Error marshaling payload: %v\n", err)
@@ -69,7 +71,6 @@ func RunClient(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Fatalf("Error publishing to tasks.internal: %v\n", err)
 		}
-		fmt.Println("Task scheduled for first time")
 	}
 	subject := fmt.Sprintf("tasks.execute.%s", taskID)
 	_, err = js.Publish(subject, payloadBytes)

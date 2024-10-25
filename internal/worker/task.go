@@ -15,7 +15,7 @@ import (
 func startTaskConsumer(js nats.JetStreamContext, taskID string, ackWait time.Duration) {
 	subject := fmt.Sprintf("tasks.execute.%s", taskID)
 	consumerName := fmt.Sprintf("consumer-%s", taskID)
-	
+
   _, err := js.AddConsumer("tasks", &nats.ConsumerConfig{
 		Durable:        consumerName,
 		AckPolicy:      nats.AckExplicitPolicy,
@@ -58,15 +58,14 @@ func startTaskConsumer(js nats.JetStreamContext, taskID string, ackWait time.Dur
 			now := time.Now()
 			if now.After(payload.NextExec) || now.Equal(payload.NextExec) {
         fmt.Printf("received task event: %v\n", payload)
-        payload.UpdateAckWait(js, consumerName)
-        // TODO: calculate and update consumer ackWait
+        go payload.UpdateAckWait(js, consumerName)
 				fmt.Printf("EXECUTING TASK: %s\n", payload.TaskID)
 				msg.Ack()
         if payload.Iter < payload.MaxIter{
           payload.Iter += 1
-          duration, err := time.ParseDuration(payload.AckWait)
+          duration, err := payload.Schedule.GetAckWait() 
           if err != nil{
-            log.Fatalf("error parsing duration: %v", err)
+            log.Fatalf("error getting ackWait: %v", err)
           }
           payload.NextExec = time.Now().Add(duration)
           payloadBytes, err := json.Marshal(payload)

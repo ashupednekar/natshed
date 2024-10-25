@@ -92,7 +92,7 @@ func consumeInternal(js nats.JetStreamContext) {
 			_, err = js.ConsumerInfo("tasks", consumerName)
 			if err != nil {
 				// Consumer doesn't exist, start a new one
-        ackDuration, err := time.ParseDuration(payload.AckWait)
+        ackDuration, err := payload.Schedule.GetAckWait()
         if err != nil {
           fmt.Printf("Error parsing ack wait duration: %v\n", err)
           return

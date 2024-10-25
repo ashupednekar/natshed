@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -13,38 +12,52 @@ type Schedule struct{
   Duration string    `json:"duration"`
 }
 
-func (s *Schedule) UpdatePayload(payload *TaskPayload) TaskPayload {
+func (s *Schedule) UpdatePayload(payload *TaskPayload) error {
+  ackWait, err := s.GetAckWait()
+  if err != nil{
+    return err
+  }
+  payload.NextExec = time.Now().Add(ackWait)
   if s.Duration == "" {
     if s.CronString != ""{
-      timeTillCron := time.Second * 5 // TODO: use a cron library to get this value
-      payload.NextExec = time.Now().Add(timeTillCron)
       payload.Schedule = Schedule{
         CronString: s.CronString,
       }
     }else{
-		  log.Fatal("Error: duration is required")
+      return fmt.Errorf("Error: cron string is required if duration is not passed")
     }
 	}else{
-    parsedDuration, err := time.ParseDuration(s.Duration)
-    if err != nil {
-      log.Fatalf("Error parsing duration: %v\n", err)
-    }
-    payload.NextExec = time.Now().Add(parsedDuration)
     payload.Schedule = Schedule{
       Duration: s.Duration,
     }
   }
-  return *payload 
+  return nil 
+}
+
+func (s *Schedule) GetAckWait() (time.Duration, error) {
+  var ackWait time.Duration 
+  if s.Duration == "" {
+    if s.CronString != ""{
+      ackWait = time.Second * 5 // TODO: use a cron library to get this value
+    }else{
+      return 0, fmt.Errorf("Error: cron string is required if duration is not passed")
+    }
+	}else{
+    parsedDuration, err := time.ParseDuration(s.Duration)
+    ackWait = parsedDuration
+    if err != nil {
+      return 0, fmt.Errorf("Error parsing duration: %v\n", err)
+    }
+  }
+  return ackWait, nil 
 }
 
 type TaskPayload struct {
 	TaskID   string    `json:"task_id"`
 	NextExec time.Time `json:"next_execution"`
-	AckWait  string    `json:"ack_wait"`
   Schedule Schedule  `json:"schedule"`
   Iter     int       `json:"iter"`
   MaxIter  int       `json:"max_iter"` 
-
 }
 
 
@@ -66,12 +79,15 @@ func (p *TaskPayload) UpdateAckWait(js nats.JetStreamContext, consumerName strin
   } else {
     return fmt.Errorf("invalid schedule config")
   }
-  ackWait = time.Second * 30
   fmt.Printf("new ackWait for %s: %v\n", consumerName, ackWait)
   fmt.Printf("consumer info: %v\n", info) 
-  _, err = js.PullSubscribe(info.Config.FilterSubject, info.Config.Name, nats.AckWait(ackWait))
-  if err != nil{
-    return err
-  }
+
+  js.UpdateConsumer("tasks", &nats.ConsumerConfig{
+		Durable:        info.Config.Name,
+		AckPolicy:      nats.AckExplicitPolicy,
+		AckWait:        ackWait,
+		FilterSubject:  info.Config.FilterSubject,
+	})
+
   return nil
 }
