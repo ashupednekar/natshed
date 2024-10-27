@@ -30,10 +30,8 @@ func RunWorker(cmd *cobra.Command, args []string) {
 	go consumeInternal(js)
 
   spawnExistingTaskConsumers(js)
-  // TODO: get consumer list from nats and spawn task consumers
 
-	// Keep the main goroutine running
-	select {}
+  select {}
 }
 
 func spawnExistingTaskConsumers(js nats.JetStreamContext){
@@ -44,7 +42,6 @@ func spawnExistingTaskConsumers(js nats.JetStreamContext){
         if consumerInfo == nil {
             break // Exit the loop if nil is returned (channel closed)
         }
-        fmt.Printf("Consumer Name: %s, Details: %+v\n", consumerInfo.Name, consumerInfo)
         taskID := strings.ReplaceAll(consumerInfo.Name, "consumer-", "")
         go startTaskConsumer(js, taskID, consumerInfo.Config.AckWait)
     }
@@ -95,7 +92,7 @@ func consumeInternal(js nats.JetStreamContext) {
 			_, err = js.ConsumerInfo("tasks", consumerName)
 			if err != nil {
 				// Consumer doesn't exist, start a new one
-        ackDuration, err := time.ParseDuration(payload.AckWait)
+        ackDuration, err := payload.Schedule.GetAckWait()
         if err != nil {
           fmt.Printf("Error parsing ack wait duration: %v\n", err)
           return
